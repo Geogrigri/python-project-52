@@ -33,7 +33,7 @@ DEBUG = os.getenv("DEBUG", "True").lower() == "true"
 
 ALLOWED_HOSTS = os.getenv(
     "ALLOWED_HOSTS",
-    "localhost,127.0.0.1,testserver,webserver",
+    "localhost,127.0.0.1,testserver,webserver,python-project-52-obym.onrender.com",
 ).split(",")
 
 

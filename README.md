@@ -27,4 +27,4 @@ Render start command:
 make render-start
 ```
 
-Deployed application: add Render URL here after deployment.
+Deployed application: https://python-project-52-obym.onrender.com
