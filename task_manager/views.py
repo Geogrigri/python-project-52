@@ -8,8 +8,8 @@ from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
 
-from task_manager.forms import StatusForm, TaskForm, UserRegistrationForm, UserUpdateForm
-from task_manager.models import Status, Task
+from task_manager.forms import LabelForm, StatusForm, TaskForm, UserRegistrationForm, UserUpdateForm
+from task_manager.models import Label, Status, Task
 
 
 class IndexView(TemplateView):
@@ -85,6 +85,52 @@ class UserLogoutView(LogoutView):
         logout(request)
         messages.success(request, "Вы разлогинены")
         return redirect("index")
+
+
+class LabelListView(LoginRequiredMixin, ListView):
+    model = Label
+    template_name = "labels/index.html"
+    context_object_name = "labels"
+
+    def get_queryset(self):
+        return Label.objects.order_by("id")
+
+
+class LabelCreateView(LoginRequiredMixin, CreateView):
+    model = Label
+    form_class = LabelForm
+    template_name = "labels/create.html"
+    success_url = reverse_lazy("labels")
+
+    def form_valid(self, form):
+        messages.success(self.request, "Метка успешно создана")
+        return super().form_valid(form)
+
+
+class LabelUpdateView(LoginRequiredMixin, UpdateView):
+    model = Label
+    form_class = LabelForm
+    template_name = "labels/update.html"
+    success_url = reverse_lazy("labels")
+
+    def form_valid(self, form):
+        messages.success(self.request, "Метка успешно изменена")
+        return super().form_valid(form)
+
+
+class LabelDeleteView(LoginRequiredMixin, DeleteView):
+    model = Label
+    template_name = "labels/delete.html"
+    success_url = reverse_lazy("labels")
+
+    def form_valid(self, form):
+        try:
+            response = super().form_valid(form)
+        except ProtectedError:
+            messages.error(self.request, "Невозможно удалить метку")
+            return redirect("labels")
+        messages.success(self.request, "Метка успешно удалена")
+        return response
 
 
 class StatusListView(LoginRequiredMixin, ListView):

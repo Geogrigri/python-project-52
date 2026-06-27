@@ -10,6 +10,14 @@ class Status(models.Model):
         return self.name
 
 
+class Label(models.Model):
+    name = models.CharField(max_length=100, unique=True, verbose_name="Имя")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
 class Task(models.Model):
     name = models.CharField(max_length=100, unique=True, verbose_name="Имя")
     description = models.TextField(verbose_name="Описание")
@@ -33,7 +41,22 @@ class Task(models.Model):
         blank=True,
         null=True,
     )
+    labels = models.ManyToManyField(
+        Label,
+        through="TaskLabel",
+        related_name="tasks",
+        verbose_name="Метки",
+        blank=True,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.name
+
+
+class TaskLabel(models.Model):
+    task = models.ForeignKey(Task, on_delete=models.CASCADE)
+    label = models.ForeignKey(Label, on_delete=models.PROTECT)
+
+    class Meta:
+        unique_together = ("task", "label")

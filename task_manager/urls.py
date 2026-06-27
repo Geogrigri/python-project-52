@@ -4,6 +4,10 @@ from django.urls import path
 from task_manager.forms import LoginForm
 from task_manager.views import (
     IndexView,
+    LabelCreateView,
+    LabelDeleteView,
+    LabelListView,
+    LabelUpdateView,
     StatusCreateView,
     StatusDeleteView,
     StatusListView,
@@ -25,6 +29,10 @@ from task_manager.views import (
 urlpatterns = [
     path("", IndexView.as_view(), name="index"),
     path("admin/", admin.site.urls),
+    path("labels/", LabelListView.as_view(), name="labels"),
+    path("labels/create/", LabelCreateView.as_view(), name="label_create"),
+    path("labels/<int:pk>/update/", LabelUpdateView.as_view(), name="label_update"),
+    path("labels/<int:pk>/delete/", LabelDeleteView.as_view(), name="label_delete"),
     path("tasks/", TaskListView.as_view(), name="tasks"),
     path("tasks/create/", TaskCreateView.as_view(), name="task_create"),
     path("tasks/<int:pk>/", TaskDetailView.as_view(), name="task_detail"),

@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from task_manager.models import Status, Task
+from task_manager.models import Label, Status, Task
 
 
 class UserCrudTests(TestCase):
@@ -427,3 +427,164 @@ class TaskCrudTests(TestCase):
         self.assertRedirects(response, reverse("statuses"))
         self.assertTrue(Status.objects.filter(pk=self.status.pk).exists())
         self.assertContains(response, "Невозможно удалить статус")
+
+
+class LabelCrudTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="label-user",
+            password="password12345",
+        )
+        self.status = Status.objects.create(name="label-status")
+        self.label = Label.objects.create(name="bug")
+        self.second_label = Label.objects.create(name="feature")
+
+    def test_labels_are_available_only_for_authenticated_users(self):
+        urls = [
+            reverse("labels"),
+            reverse("label_create"),
+            reverse("label_update", kwargs={"pk": self.label.pk}),
+            reverse("label_delete", kwargs={"pk": self.label.pk}),
+        ]
+
+        for url in urls:
+            response = self.client.get(url)
+            self.assertRedirects(
+                response,
+                f"{reverse('login')}?next={url}",
+                fetch_redirect_response=False,
+            )
+
+    def test_labels_list(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.get(reverse("labels"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Метки")
+        self.assertContains(response, "Создать метку")
+        self.assertContains(response, "bug")
+        self.assertContains(response, "Изменить")
+        self.assertContains(response, "Удалить")
+
+    def test_label_create_page_contains_expected_field(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.get(reverse("label_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="name"')
+        self.assertContains(response, 'id="id_name"')
+        self.assertContains(response, "Имя")
+        self.assertContains(response, "Создать")
+
+    def test_user_can_create_label(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(
+            reverse("label_create"),
+            {"name": "urgent"},
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("labels"))
+        self.assertTrue(Label.objects.filter(name="urgent").exists())
+        self.assertContains(response, "Метка успешно создана")
+
+    def test_label_unique_name_validation_mentions_exists(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(reverse("label_create"), {"name": "bug"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+
+    def test_user_can_update_label(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(
+            reverse("label_update", kwargs={"pk": self.label.pk}),
+            {"name": "backend"},
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("labels"))
+        self.label.refresh_from_db()
+        self.assertEqual(self.label.name, "backend")
+        self.assertContains(response, "Метка успешно изменена")
+
+    def test_user_can_delete_unused_label(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(
+            reverse("label_delete", kwargs={"pk": self.label.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("labels"))
+        self.assertFalse(Label.objects.filter(pk=self.label.pk).exists())
+        self.assertContains(response, "Метка успешно удалена")
+
+    def test_user_cannot_delete_label_related_to_task(self):
+        task = Task.objects.create(
+            name="Задача с меткой",
+            description="Описание",
+            status=self.status,
+            author=self.user,
+        )
+        task.labels.add(self.label)
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(
+            reverse("label_delete", kwargs={"pk": self.label.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("labels"))
+        self.assertTrue(Label.objects.filter(pk=self.label.pk).exists())
+        self.assertContains(response, "Невозможно удалить метку")
+
+    def test_user_can_create_task_with_labels(self):
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(
+            reverse("task_create"),
+            {
+                "name": "Задача с несколькими метками",
+                "description": "Описание",
+                "status": self.status.pk,
+                "executor": "",
+                "labels": [self.label.pk, self.second_label.pk],
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("tasks"))
+        task = Task.objects.get(name="Задача с несколькими метками")
+        self.assertCountEqual(task.labels.all(), [self.label, self.second_label])
+
+    def test_user_can_update_task_labels(self):
+        task = Task.objects.create(
+            name="Задача для обновления меток",
+            description="Описание",
+            status=self.status,
+            author=self.user,
+        )
+        task.labels.add(self.label)
+        self.client.login(username="label-user", password="password12345")
+
+        response = self.client.post(
+            reverse("task_update", kwargs={"pk": task.pk}),
+            {
+                "name": task.name,
+                "description": task.description,
+                "status": self.status.pk,
+                "executor": "",
+                "labels": [self.second_label.pk],
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("tasks"))
+        task.refresh_from_db()
+        self.assertCountEqual(task.labels.all(), [self.second_label])

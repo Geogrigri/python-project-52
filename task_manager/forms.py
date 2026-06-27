@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 
-from task_manager.models import Status, Task
+from task_manager.models import Label, Status, Task
 
 
 class UserRegistrationForm(UserCreationForm):
@@ -47,12 +47,21 @@ class StatusForm(forms.ModelForm):
         }
 
 
+class LabelForm(forms.ModelForm):
+    class Meta:
+        model = Label
+        fields = ("name",)
+        labels = {
+            "name": "Имя",
+        }
+
+
 class TaskForm(forms.ModelForm):
-    labels = forms.MultipleChoiceField(
+    labels = forms.ModelMultipleChoiceField(
         label="Метки",
+        queryset=Label.objects.all(),
         required=False,
-        choices=(),
-        disabled=True,
+        widget=forms.SelectMultiple,
     )
 
     class Meta:

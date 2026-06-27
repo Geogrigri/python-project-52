@@ -21,7 +21,11 @@
     </tr>
     <tr>
       <th>Метки</th>
-      <td></td>
+      <td>
+        {% for label in object.labels.all %}
+          <span class="badge bg-secondary">{{ label.name }}</span>
+        {% endfor %}
+      </td>
     </tr>
     <tr>
       <th>Дата создания</th>
