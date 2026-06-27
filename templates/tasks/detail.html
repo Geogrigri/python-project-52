@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}{{ object.name }}{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">{{ object.name }}</h1>
+<p>{{ object.description }}</p>
+<table class="table table-bordered">
+  <tbody>
+    <tr>
+      <th>Автор</th>
+      <td>{{ object.author.username }}</td>
+    </tr>
+    <tr>
+      <th>Исполнитель</th>
+      <td>{{ object.executor.username|default:"" }}</td>
+    </tr>
+    <tr>
+      <th>Статус</th>
+      <td>{{ object.status.name }}</td>
+    </tr>
+    <tr>
+      <th>Метки</th>
+      <td></td>
+    </tr>
+    <tr>
+      <th>Дата создания</th>
+      <td>{{ object.created_at|date:"d.m.Y H:i" }}</td>
+    </tr>
+  </tbody>
+</table>
+<a href="{% url 'task_update' object.id %}">Изменить</a>
+<br>
+<a href="{% url 'task_delete' object.id %}">Удалить</a>
+{% endblock %}

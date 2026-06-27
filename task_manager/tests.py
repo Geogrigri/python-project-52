@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from task_manager.models import Status
+from task_manager.models import Status, Task
 
 
 class UserCrudTests(TestCase):
@@ -170,7 +170,7 @@ class StatusCrudTests(TestCase):
 
         for url in urls:
             response = self.client.get(url)
-            self.assertRedirects(response, f"{reverse('login')}?next={url}")
+            self.assertRedirects(response, f"{reverse('login')}?next={url}", fetch_redirect_response=False)
 
     def test_statuses_list(self):
         self.client.login(username="status-user", password="password12345")
@@ -241,3 +241,189 @@ class StatusCrudTests(TestCase):
         self.assertRedirects(response, reverse("statuses"))
         self.assertFalse(Status.objects.filter(pk=self.status.pk).exists())
         self.assertContains(response, "Статус успешно удален")
+
+
+class TaskCrudTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="author",
+            password="password12345",
+        )
+        self.executor = User.objects.create_user(
+            username="executor",
+            password="password12345",
+        )
+        self.other_user = User.objects.create_user(
+            username="other",
+            password="password12345",
+        )
+        self.status = Status.objects.create(name="новый")
+        self.task = Task.objects.create(
+            name="Первая задача",
+            description="Описание первой задачи",
+            status=self.status,
+            author=self.author,
+            executor=self.executor,
+        )
+
+    def test_tasks_are_available_only_for_authenticated_users(self):
+        urls = [
+            reverse("tasks"),
+            reverse("task_create"),
+            reverse("task_detail", kwargs={"pk": self.task.pk}),
+            reverse("task_update", kwargs={"pk": self.task.pk}),
+            reverse("task_delete", kwargs={"pk": self.task.pk}),
+        ]
+
+        for url in urls:
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{reverse('login')}?next={url}", fetch_redirect_response=False)
+
+    def test_tasks_list(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.get(reverse("tasks"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Задачи")
+        self.assertContains(response, "Создать задачу")
+        self.assertContains(response, "Первая задача")
+        self.assertContains(response, "новый")
+        self.assertContains(response, "author")
+        self.assertContains(response, "executor")
+        self.assertContains(response, "Показать")
+        self.assertContains(response, "Изменить")
+        self.assertContains(response, "Удалить")
+
+    def test_task_create_page_contains_expected_fields(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.get(reverse("task_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="name"')
+        self.assertContains(response, 'name="description"')
+        self.assertContains(response, 'name="status"')
+        self.assertContains(response, 'name="executor"')
+        self.assertContains(response, "Имя")
+        self.assertContains(response, "Описание")
+        self.assertContains(response, "Статус")
+        self.assertContains(response, "Исполнитель")
+        self.assertContains(response, "Метки")
+        self.assertContains(response, "Создать")
+
+    def test_user_can_create_task(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.post(
+            reverse("task_create"),
+            {
+                "name": "Новая задача",
+                "description": "Описание новой задачи",
+                "status": self.status.pk,
+                "executor": self.executor.pk,
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("tasks"))
+        task = Task.objects.get(name="Новая задача")
+        self.assertEqual(task.author, self.author)
+        self.assertEqual(task.executor, self.executor)
+        self.assertContains(response, "Задача успешно создана")
+
+    def test_task_unique_name_validation_mentions_exists(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.post(
+            reverse("task_create"),
+            {
+                "name": "Первая задача",
+                "description": "Другое описание",
+                "status": self.status.pk,
+                "executor": self.executor.pk,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+
+    def test_user_can_view_task(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.get(reverse("task_detail", kwargs={"pk": self.task.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Первая задача")
+        self.assertContains(response, "Описание первой задачи")
+        self.assertContains(response, "Статус")
+        self.assertContains(response, "Исполнитель")
+        self.assertContains(response, "Метки")
+
+    def test_user_can_update_task(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.post(
+            reverse("task_update", kwargs={"pk": self.task.pk}),
+            {
+                "name": "Обновленная задача",
+                "description": "Новое описание",
+                "status": self.status.pk,
+                "executor": self.other_user.pk,
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("tasks"))
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.name, "Обновленная задача")
+        self.assertEqual(self.task.executor, self.other_user)
+        self.assertContains(response, "Задача успешно изменена")
+
+    def test_author_can_delete_task(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.post(
+            reverse("task_delete", kwargs={"pk": self.task.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("tasks"))
+        self.assertFalse(Task.objects.filter(pk=self.task.pk).exists())
+        self.assertContains(response, "Задача успешно удалена")
+
+    def test_non_author_cannot_delete_task(self):
+        self.client.login(username="other", password="password12345")
+
+        response = self.client.post(
+            reverse("task_delete", kwargs={"pk": self.task.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("tasks"))
+        self.assertTrue(Task.objects.filter(pk=self.task.pk).exists())
+        self.assertContains(response, "Задачу может удалить только ее автор")
+
+    def test_related_user_cannot_be_deleted(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.post(
+            reverse("user_delete", kwargs={"pk": self.author.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("users"))
+        self.assertTrue(User.objects.filter(pk=self.author.pk).exists())
+        self.assertContains(response, "Невозможно удалить пользователя")
+
+    def test_related_status_cannot_be_deleted(self):
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.post(
+            reverse("status_delete", kwargs={"pk": self.status.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("statuses"))
+        self.assertTrue(Status.objects.filter(pk=self.status.pk).exists())
+        self.assertContains(response, "Невозможно удалить статус")
