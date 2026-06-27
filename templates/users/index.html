@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Пользователи{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Пользователи</h1>
+<table class="table table-striped">
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Имя пользователя</th>
+      <th>Полное имя</th>
+      <th>Дата создания</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for current_user in users %}
+      <tr>
+        <td>{{ current_user.id }}</td>
+        <td>{{ current_user.username }}</td>
+        <td>{{ current_user.get_full_name }}</td>
+        <td>{{ current_user.date_joined|date:"d.m.Y H:i" }}</td>
+        <td>
+          <a href="{% url 'user_update' current_user.id %}">Изменить</a>
+          <br>
+          <a href="{% url 'user_delete' current_user.id %}">Удалить</a>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}
