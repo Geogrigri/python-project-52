@@ -7,7 +7,9 @@ from django.db.models import ProtectedError
 from django.shortcuts import redirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, TemplateView, UpdateView
+from django_filters.views import FilterView
 
+from task_manager.filters import TaskFilter
 from task_manager.forms import LabelForm, StatusForm, TaskForm, UserRegistrationForm, UserUpdateForm
 from task_manager.models import Label, Status, Task
 
@@ -179,15 +181,16 @@ class StatusDeleteView(LoginRequiredMixin, DeleteView):
         return response
 
 
-class TaskListView(LoginRequiredMixin, ListView):
+class TaskListView(LoginRequiredMixin, FilterView):
     model = Task
+    filterset_class = TaskFilter
     template_name = "tasks/index.html"
     context_object_name = "tasks"
 
     def get_queryset(self):
         return Task.objects.select_related(
             "status", "author", "executor"
-        ).order_by("id")
+        ).prefetch_related("labels").order_by("id")
 
 
 class TaskDetailView(LoginRequiredMixin, DetailView):

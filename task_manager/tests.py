@@ -588,3 +588,106 @@ class LabelCrudTests(TestCase):
         self.assertRedirects(response, reverse("tasks"))
         task.refresh_from_db()
         self.assertCountEqual(task.labels.all(), [self.second_label])
+
+
+class TaskFilterTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user(
+            username="filter-author",
+            password="password12345",
+        )
+        self.other_author = User.objects.create_user(
+            username="filter-other-author",
+            password="password12345",
+        )
+        self.executor = User.objects.create_user(
+            username="filter-executor",
+            password="password12345",
+        )
+        self.other_executor = User.objects.create_user(
+            username="filter-other-executor",
+            password="password12345",
+        )
+        self.new_status = Status.objects.create(name="filter-new")
+        self.done_status = Status.objects.create(name="filter-done")
+        self.bug_label = Label.objects.create(name="filter-bug")
+        self.feature_label = Label.objects.create(name="filter-feature")
+        self.first_task = Task.objects.create(
+            name="Filter first task",
+            description="First",
+            status=self.new_status,
+            author=self.author,
+            executor=self.executor,
+        )
+        self.first_task.labels.add(self.bug_label)
+        self.second_task = Task.objects.create(
+            name="Filter second task",
+            description="Second",
+            status=self.done_status,
+            author=self.other_author,
+            executor=self.other_executor,
+        )
+        self.second_task.labels.add(self.feature_label)
+
+    def test_filter_form_has_expected_fields_and_labels(self):
+        self.client.login(username="filter-author", password="password12345")
+
+        response = self.client.get(reverse("tasks"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="status"')
+        self.assertContains(response, 'name="executor"')
+        self.assertContains(response, 'name="labels"')
+        self.assertContains(response, 'name="self_tasks"')
+        self.assertContains(response, "Статус")
+        self.assertContains(response, "Исполнитель")
+        self.assertContains(response, "Метка")
+        self.assertContains(response, "Только свои задачи")
+
+    def test_filter_tasks_by_status(self):
+        self.client.login(username="filter-author", password="password12345")
+
+        response = self.client.get(reverse("tasks"), {"status": self.new_status.pk})
+
+        self.assertContains(response, "Filter first task")
+        self.assertNotContains(response, "Filter second task")
+
+    def test_filter_tasks_by_executor(self):
+        self.client.login(username="filter-author", password="password12345")
+
+        response = self.client.get(reverse("tasks"), {"executor": self.other_executor.pk})
+
+        self.assertNotContains(response, "Filter first task")
+        self.assertContains(response, "Filter second task")
+
+    def test_filter_tasks_by_label(self):
+        self.client.login(username="filter-author", password="password12345")
+
+        response = self.client.get(reverse("tasks"), {"labels": self.bug_label.pk})
+
+        self.assertContains(response, "Filter first task")
+        self.assertNotContains(response, "Filter second task")
+
+    def test_filter_only_self_tasks(self):
+        self.client.login(username="filter-author", password="password12345")
+
+        response = self.client.get(reverse("tasks"), {"self_tasks": "on"})
+
+        self.assertContains(response, "Filter first task")
+        self.assertNotContains(response, "Filter second task")
+
+    def test_filter_combines_conditions(self):
+        self.client.login(username="filter-author", password="password12345")
+
+        response = self.client.get(
+            reverse("tasks"),
+            {
+                "status": self.new_status.pk,
+                "executor": self.executor.pk,
+                "labels": self.bug_label.pk,
+                "self_tasks": "on",
+            },
+        )
+
+        self.assertContains(response, "Filter first task")
+        self.assertNotContains(response, "Filter second task")
