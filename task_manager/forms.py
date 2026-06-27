@@ -2,6 +2,8 @@ from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth.models import User
 
+from task_manager.models import Status
+
 
 class UserRegistrationForm(UserCreationForm):
     first_name = forms.CharField(label="Имя", required=False)
@@ -34,3 +36,12 @@ class UserUpdateForm(forms.ModelForm):
 class LoginForm(AuthenticationForm):
     username = forms.CharField(label="Имя пользователя")
     password = forms.CharField(label="Пароль", widget=forms.PasswordInput)
+
+
+class StatusForm(forms.ModelForm):
+    class Meta:
+        model = Status
+        fields = ("name",)
+        labels = {
+            "name": "Имя",
+        }

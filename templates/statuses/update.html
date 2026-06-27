@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% load django_bootstrap5 %}
+
+{% block title %}Изменение статуса{% endblock %}
+
+{% block content %}
+<h1 class="mb-4">Изменение статуса</h1>
+<form method="post">
+  {% csrf_token %}
+  {% bootstrap_form form %}
+  <input class="btn btn-primary" type="submit" value="Изменить">
+</form>
+{% endblock %}

@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
+from task_manager.models import Status
+
 
 class UserCrudTests(TestCase):
     def setUp(self):
@@ -148,3 +150,94 @@ class UserCrudTests(TestCase):
         self.assertRedirects(response, reverse("users"))
         self.assertTrue(User.objects.filter(pk=self.other_user.pk).exists())
         self.assertContains(response, "У вас нет прав для изменения")
+
+
+class StatusCrudTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="status-user",
+            password="password12345",
+        )
+        self.status = Status.objects.create(name="новый")
+
+    def test_statuses_are_available_only_for_authenticated_users(self):
+        urls = [
+            reverse("statuses"),
+            reverse("status_create"),
+            reverse("status_update", kwargs={"pk": self.status.pk}),
+            reverse("status_delete", kwargs={"pk": self.status.pk}),
+        ]
+
+        for url in urls:
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{reverse('login')}?next={url}")
+
+    def test_statuses_list(self):
+        self.client.login(username="status-user", password="password12345")
+
+        response = self.client.get(reverse("statuses"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Статусы")
+        self.assertContains(response, "Создать статус")
+        self.assertContains(response, "новый")
+        self.assertContains(response, "Изменить")
+        self.assertContains(response, "Удалить")
+
+    def test_status_create_page_contains_expected_field(self):
+        self.client.login(username="status-user", password="password12345")
+
+        response = self.client.get(reverse("status_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="name"')
+        self.assertContains(response, 'id="id_name"')
+        self.assertContains(response, "Имя")
+        self.assertContains(response, "Создать")
+
+    def test_user_can_create_status(self):
+        self.client.login(username="status-user", password="password12345")
+
+        response = self.client.post(
+            reverse("status_create"),
+            {"name": "в работе"},
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("statuses"))
+        self.assertTrue(Status.objects.filter(name="в работе").exists())
+        self.assertContains(response, "Статус успешно создан")
+
+    def test_status_unique_name_validation_mentions_exists(self):
+        self.client.login(username="status-user", password="password12345")
+
+        response = self.client.post(reverse("status_create"), {"name": "новый"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "already exists")
+
+    def test_user_can_update_status(self):
+        self.client.login(username="status-user", password="password12345")
+
+        response = self.client.post(
+            reverse("status_update", kwargs={"pk": self.status.pk}),
+            {"name": "на тестировании"},
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("statuses"))
+        self.status.refresh_from_db()
+        self.assertEqual(self.status.name, "на тестировании")
+        self.assertContains(response, "Статус успешно изменен")
+
+    def test_user_can_delete_status(self):
+        self.client.login(username="status-user", password="password12345")
+
+        response = self.client.post(
+            reverse("status_delete", kwargs={"pk": self.status.pk}),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("statuses"))
+        self.assertFalse(Status.objects.filter(pk=self.status.pk).exists())
+        self.assertContains(response, "Статус успешно удален")
