@@ -28,3 +28,12 @@ make render-start
 ```
 
 Deployed application: https://python-project-52-obym.onrender.com
+
+### Error tracking
+
+Set these environment variables in production to send errors to Rollbar:
+
+```bash
+ROLLBAR_ACCESS_TOKEN=<server access token>
+ROLLBAR_ENVIRONMENT=production
+```
