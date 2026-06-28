@@ -148,7 +148,10 @@ LOGOUT_REDIRECT_URL = "index"
 
 ROLLBAR = {
     "access_token": os.getenv("ROLLBAR_ACCESS_TOKEN"),
-    "environment": os.getenv("ROLLBAR_ENVIRONMENT", "development"),
-    "root": BASE_DIR,
+    "environment": os.getenv(
+        "ROLLBAR_ENVIRONMENT",
+        "development" if DEBUG else "production",
+    ),
+    "root": str(BASE_DIR),
     "enabled": bool(os.getenv("ROLLBAR_ACCESS_TOKEN")),
 }
