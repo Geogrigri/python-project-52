@@ -127,6 +127,37 @@ class UserCrudTests(TestCase):
         self.assertEqual(self.user.last_name, "Сергеев")
         self.assertContains(response, "Пользователь успешно изменен")
 
+    def test_user_update_page_contains_password_fields(self):
+        self.client.login(username="ivan", password="password12345")
+
+        response = self.client.get(reverse("user_update", kwargs={"pk": self.user.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="password1"')
+        self.assertContains(response, 'name="password2"')
+        self.assertContains(response, "Пароль")
+        self.assertContains(response, "Подтверждение пароля")
+
+    def test_user_can_update_self_with_password(self):
+        self.client.login(username="ivan", password="password12345")
+
+        response = self.client.post(
+            reverse("user_update", kwargs={"pk": self.user.pk}),
+            {
+                "first_name": "Иван",
+                "last_name": "Сергеев",
+                "username": "ivan-new",
+                "password1": "new-password",
+                "password2": "new-password",
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("users"))
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.check_password("new-password"))
+        self.assertContains(response, "Пользователь успешно изменен")
+
     def test_user_cannot_update_another_user(self):
         self.client.login(username="ivan", password="password12345")
 
@@ -329,6 +360,17 @@ class TaskCrudTests(TestCase):
         self.assertContains(response, "Исполнитель")
         self.assertContains(response, "Метки")
         self.assertContains(response, "Создать")
+
+    def test_task_create_page_shows_executor_full_name(self):
+        self.executor.first_name = "Иван"
+        self.executor.last_name = "Исполнитель"
+        self.executor.save()
+        self.client.login(username="author", password="password12345")
+
+        response = self.client.get(reverse("task_create"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Иван Исполнитель")
 
     def test_user_can_create_task(self):
         self.client.login(username="author", password="password12345")

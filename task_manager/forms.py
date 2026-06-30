@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth.password_validation import validate_password
 from django.contrib.auth.models import User
 
 from task_manager.models import Label, Status, Task
@@ -23,14 +24,48 @@ class UserRegistrationForm(UserCreationForm):
 
 
 class UserUpdateForm(forms.ModelForm):
+    password1 = forms.CharField(
+        label="Пароль",
+        required=False,
+        widget=forms.PasswordInput,
+    )
+    password2 = forms.CharField(
+        label="Подтверждение пароля",
+        required=False,
+        widget=forms.PasswordInput,
+    )
+
     class Meta:
         model = User
-        fields = ("first_name", "last_name", "username")
+        fields = ("first_name", "last_name", "username", "password1", "password2")
         labels = {
             "first_name": "Имя",
             "last_name": "Фамилия",
             "username": "Имя пользователя",
         }
+
+    def clean_password2(self):
+        password1 = self.cleaned_data.get("password1")
+        password2 = self.cleaned_data.get("password2")
+        if password1 or password2:
+            if password1 != password2:
+                raise forms.ValidationError("The two password fields didn’t match.")
+            validate_password(password2, self.instance)
+        return password2
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get("password1")
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user
+
+
+class UserChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        return obj.get_full_name() or obj.username
 
 
 class LoginForm(AuthenticationForm):
@@ -57,6 +92,11 @@ class LabelForm(forms.ModelForm):
 
 
 class TaskForm(forms.ModelForm):
+    executor = UserChoiceField(
+        label="Исполнитель",
+        queryset=User.objects.all(),
+        required=False,
+    )
     labels = forms.ModelMultipleChoiceField(
         label="Метки",
         queryset=Label.objects.all(),
