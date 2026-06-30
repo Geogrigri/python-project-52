@@ -40,6 +40,24 @@ class UserCrudTests(TestCase):
         self.assertContains(response, 'name="password2"')
         self.assertContains(response, "Зарегистрировать")
 
+    def test_user_can_register_with_simple_password(self):
+        response = self.client.post(
+            reverse("user_create"),
+            {
+                "first_name": "Simple",
+                "last_name": "Password",
+                "username": "simple-password-user",
+                "password1": "password",
+                "password2": "password",
+            },
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse("login"))
+        self.assertTrue(
+            User.objects.filter(username="simple-password-user").exists()
+        )
+
     def test_user_can_register(self):
         response = self.client.post(
             reverse("user_create"),
